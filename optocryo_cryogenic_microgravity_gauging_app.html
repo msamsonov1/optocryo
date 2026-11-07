@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OptoCryo: Cryogenic Tank Optical Mass Gauge & Slosh Dampener</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- MathJax Configuration & Loader (Must precede mathjax script) -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #05070d;
+      color: #e2e8f0;
+    }
+    .mono-font {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .formula-box {
+      background-color: #030712;
+      border: 1px solid #1f2937;
+      padding: 0.85rem;
+      border-radius: 0.5rem;
+      color: #67e8f9;
+      font-size: 0.875rem;
+      overflow-x: auto;
+      margin: 0.6rem 0;
+    }
+    /* Custom Scrollbar for Sleek Aerospace Telemetry HUD */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #06b6d4;
+    }
+    .glow-cyan {
+      box-shadow: 0 0 20px -3px rgba(6, 182, 212, 0.35);
+    }
+    .glow-violet {
+      box-shadow: 0 0 20px -3px rgba(139, 92, 246, 0.35);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#05070d] text-slate-100 selection:bg-cyan-500/30 selection:text-cyan-200">
+
+  <!-- Header Navigation -->
+  <header class="border-b border-gray-800 bg-[#080c14]/90 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="h-9 w-9 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+          <i data-lucide="orbit" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold tracking-tight text-white text-base sm:text-lg">OptoCryo</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 mono-font font-medium">NASA CFM-SBIR</span>
+          </div>
+          <p class="text-[11px] text-gray-400 hidden sm:block">Zero-G Optical $(\lambda, m)$ Propellant Gauging & Slosh State Observer</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex space-x-1 sm:space-x-2 bg-gray-950/80 p-1 rounded-xl border border-gray-800">
+        <button id="tabBtnSim" onclick="switchTab('sim')" class="px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 bg-cyan-600 text-white shadow-sm flex items-center space-x-1.5">
+          <i data-lucide="activity" class="w-4 h-4"></i>
+          <span>Sim HUD</span>
+        </button>
+        <button id="tabBtnPhysics" onclick="switchTab('physics')" class="px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900 flex items-center space-x-1.5">
+          <i data-lucide="cpu" class="w-4 h-4"></i>
+          <span>Physics & Math</span>
+        </button>
+        <button id="tabBtnProposal" onclick="switchTab('proposal')" class="px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900 flex items-center space-x-1.5">
+          <i data-lucide="file-check" class="w-4 h-4"></i>
+          <span>$225k SBIR</span>
+        </button>
+        <button id="tabBtnARR" onclick="switchTab('arr')" class="px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900 flex items-center space-x-1.5">
+          <i data-lucide="trending-up" class="w-4 h-4"></i>
+          <span>Commercial ARR</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: Live Simulation & Telemetry HUD                                   -->
+    <!-- ========================================================================= -->
+    <div id="viewSim" class="space-y-6">
+
+      <!-- Top Status Banner -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-gray-900/60 border border-gray-800 rounded-xl p-4 backdrop-blur-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Active Fluid State</div>
+            <div id="tankStateBadge" class="text-sm font-bold text-emerald-400 mt-1 flex items-center space-x-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Reconciled Equilibrium</span>
+            </div>
+          </div>
+          <div class="text-right mono-font">
+            <span class="text-xs text-gray-500">Fluid Temp</span>
+            <div id="telemetryTemp" class="text-base font-semibold text-cyan-300">20.4 K</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900/60 border border-gray-800 rounded-xl p-4 backdrop-blur-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">Optical Absorption Peak</div>
+            <div id="telemetryWavelength" class="text-lg font-bold text-cyan-400 mono-font mt-0.5">1.412 µm</div>
+          </div>
+          <div class="text-right mono-font">
+            <span class="text-xs text-gray-500">Vapor Density</span>
+            <div id="telemetryVapor" class="text-sm font-semibold text-gray-200">1.34 kg/m³</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900/60 border border-gray-800 rounded-xl p-4 backdrop-blur-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">RF Bulk Liquid Mass</div>
+            <div id="telemetryMass" class="text-lg font-bold text-violet-400 mono-font mt-0.5">4,812 kg</div>
+          </div>
+          <div class="text-right mono-font">
+            <span class="text-xs text-gray-500">Fill Level (Est)</span>
+            <div id="telemetryFill" class="text-sm font-semibold text-gray-200">68.2 %</div>
+          </div>
+        </div>
+
+        <div class="bg-gray-900/60 border border-gray-800 rounded-xl p-4 backdrop-blur-sm flex items-center justify-between">
+          <div>
+            <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">RCS Fuel Conserved</div>
+            <div id="telemetryFuelSaved" class="text-lg font-bold text-emerald-400 mono-font mt-0.5">142.8 kg</div>
+          </div>
+          <div class="text-right mono-font">
+            <span class="text-xs text-gray-500">Settling Burns</span>
+            <div class="text-sm font-semibold text-emerald-300">0 Req (Bypassed)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Interactive Workstation (Canvas + Phase Space Chart) -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left: Microgravity Tank Canvas Simulation -->
+        <div class="lg:col-span-7 bg-gray-900/40 border border-gray-800 rounded-2xl p-4 sm:p-5 flex flex-col relative overflow-hidden backdrop-blur-md">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-2">
+              <span class="p-1.5 rounded-lg bg-cyan-950/70 border border-cyan-800/80 text-cyan-400">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </span>
+              <div>
+                <h3 class="text-sm font-semibold text-white">Microgravity Cryo Tank Cross-Section</h3>
+                <p class="text-[11px] text-gray-400">Laser absorption grid (1.3–1.6 µm) & RF modal mass resonator</p>
+              </div>
+            </div>
+            <span id="canvasModeBadge" class="text-[11px] mono-font px-2.5 py-1 rounded-md bg-cyan-900/40 border border-cyan-700/60 text-cyan-300">
+              TUNED DIODE LASER ACTIVE
+            </span>
+          </div>
+
+          <!-- HTML5 Canvas Container -->
+          <div class="relative w-full h-[320px] sm:h-[360px] bg-[#03050a] rounded-xl border border-gray-800 overflow-hidden flex items-center justify-center">
+            <canvas id="tankCanvas" class="w-full h-full block"></canvas>
+            
+            <!-- Canvas Overlay Gauges -->
+            <div class="absolute top-3 left-3 bg-gray-950/80 border border-gray-800 rounded-lg p-2 backdrop-blur-md pointer-events-none">
+              <div class="text-[10px] text-gray-400 mono-font">OPTICAL PATH LENGTH</div>
+              <div class="text-xs font-semibold text-cyan-400 mono-font">L = 2.40 m (Folded Multi-Pass)</div>
+            </div>
+
+            <div class="absolute bottom-3 left-3 bg-gray-950/80 border border-gray-800 rounded-lg p-2 backdrop-blur-md pointer-events-none">
+              <div class="text-[10px] text-gray-400 mono-font">MICRO-G ACCELERATION</div>
+              <div id="overlayG" class="text-xs font-semibold text-emerald-400 mono-font">a = 1.2 × 10⁻⁵ g</div>
+            </div>
+
+            <div class="absolute bottom-3 right-3 bg-gray-950/80 border border-gray-800 rounded-lg p-2 backdrop-blur-md pointer-events-none text-right">
+              <div class="text-[10px] text-gray-400 mono-font">PHASE INTERACTION</div>
+              <div id="overlayState" class="text-xs font-semibold text-cyan-300 mono-font">Unsettled Multi-Globule Liquid</div>
+            </div>
+          </div>
+
+          <!-- Canvas Hardware Controls Bar -->
+          <div class="mt-4 pt-3 border-t border-gray-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button onclick="triggerImpulseSlosh()" class="px-3 py-2 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 text-xs font-medium rounded-lg text-amber-300 border border-amber-500/30 flex items-center justify-center space-x-1.5 transition">
+              <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+              <span>Inject Slosh Shock</span>
+            </button>
+            <button onclick="toggleBoilOffAnomaly()" id="btnBoilOff" class="px-3 py-2 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 text-xs font-medium rounded-lg text-rose-300 border border-rose-500/30 flex items-center justify-center space-x-1.5 transition">
+              <i data-lucide="flame" class="w-3.5 h-3.5"></i>
+              <span>Simulate Vent Spike</span>
+            </button>
+            <button onclick="triggerLaserAutoCalibration()" class="px-3 py-2 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 text-xs font-medium rounded-lg text-cyan-300 border border-cyan-500/30 flex items-center justify-center space-x-1.5 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Spectra Sweep</span>
+            </button>
+            <button onclick="resetSimulation()" class="px-3 py-2 bg-gray-800 hover:bg-gray-750 active:bg-gray-700 text-xs font-medium rounded-lg text-gray-300 border border-gray-700 flex items-center justify-center space-x-1.5 transition">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>Reset Nominal</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Diagnostic Phase-Space Chart (Lambda vs Mass) -->
+        <div class="lg:col-span-5 bg-gray-900/40 border border-gray-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between backdrop-blur-md">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <span class="p-1.5 rounded-lg bg-violet-950/70 border border-violet-800/80 text-violet-400">
+                  <i data-lucide="git-commit" class="w-4 h-4"></i>
+                </span>
+                <div>
+                  <h3 class="text-sm font-semibold text-white">Diagnostic Phase-Space Trajectory</h3>
+                  <p class="text-[11px] text-gray-400">Laser Wavelength $\lambda$ (Vapor) vs RF Bulk Mass $m$</p>
+                </div>
+              </div>
+              <span class="text-[10px] mono-font px-2 py-0.5 rounded bg-gray-800 text-gray-300 border border-gray-700">
+                $(\lambda, m)$ Coordinate
+              </span>
+            </div>
+
+            <!-- Chart.js Phase Space Plot -->
+            <div class="relative w-full h-[270px] bg-[#03050a] rounded-xl border border-gray-800 p-2">
+              <canvas id="phaseSpaceChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Phase Space Explanatory Micro-HUD -->
+          <div class="mt-3 p-3 bg-gray-950/60 rounded-xl border border-gray-800/80 text-xs space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-gray-400 flex items-center space-x-1">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span>
+                <span>Active Trajectory:</span>
+              </span>
+              <span id="phaseCoordReadout" class="mono-font text-cyan-300 font-semibold">λ: 1.412 µm | m: 4,812 kg</span>
+            </div>
+            <div class="flex items-center justify-between text-gray-400">
+              <span>Dual-State Observer Rejection:</span>
+              <span id="observerConfidence" class="text-emerald-400 mono-font font-medium">99.4% (Noise Free)</span>
+            </div>
+            <p class="text-[11px] text-gray-400 pt-1 border-t border-gray-800">
+              When propellant sloshes or divides into chaotic droplets, RF mass $m$ fluctuates while vapor absorption $\lambda$ remains path-integrated, allowing the state observer to decouple slosh kinematics from true propellant quantity without settling burns.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Closed-Loop Control Sliders & Telemetry Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Sliders & Environmental Settings -->
+        <div class="lg:col-span-4 bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md space-y-4">
+          <div class="flex items-center space-x-2 border-b border-gray-800 pb-3">
+            <i data-lucide="sliders" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-sm font-semibold text-white">Closed-Loop CFM System Controls</h3>
+          </div>
+
+          <!-- Slider 1: Tank Fill Fraction -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-300">Propellant Fill Level ($LH_2$)</span>
+              <span id="sliderFillLabel" class="mono-font text-cyan-400 font-semibold">68 %</span>
+            </div>
+            <input id="sliderFill" type="range" min="10" max="95" value="68" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400" oninput="updateFillSlider(this.value)">
+            <div class="flex justify-between text-[10px] text-gray-400 mono-font">
+              <span>10% (Depleted)</span>
+              <span>50%</span>
+              <span>95% (Loaded)</span>
+            </div>
+          </div>
+
+          <!-- Slider 2: Microgravity Slosh Disturbance Amplitude -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-300">Spacecraft RCS Residual Jitter</span>
+              <span id="sliderSloshLabel" class="mono-font text-amber-400 font-semibold">0.45 m/s²</span>
+            </div>
+            <input id="sliderSlosh" type="range" min="0" max="200" value="45" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-amber-400" oninput="updateSloshSlider(this.value)">
+            <div class="flex justify-between text-[10px] text-gray-400 mono-font">
+              <span>Quiescent (0 g)</span>
+              <span>Attitude Slew</span>
+              <span>High Jitter (2.0)</span>
+            </div>
+          </div>
+
+          <!-- Slider 3: Ullage Heat Inleak Rate -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs">
+              <span class="text-gray-300">Solar Thermal Inleak ($\dot{Q}$)</span>
+              <span id="sliderHeatLabel" class="mono-font text-rose-400 font-semibold">12.0 W</span>
+            </div>
+            <input id="sliderHeat" type="range" min="1" max="50" value="12" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-rose-400" oninput="updateHeatSlider(this.value)">
+            <div class="flex justify-between text-[10px] text-gray-400 mono-font">
+              <span>MLI Ideal (1 W)</span>
+              <span>Sun-Facing (25 W)</span>
+              <span>Degraded (50 W)</span>
+            </div>
+          </div>
+
+          <!-- Autonomous State Observer Toggle -->
+          <div class="pt-3 border-t border-gray-800 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-medium text-gray-200">Extended Kalman Filter (EKF)</div>
+              <div class="text-[11px] text-gray-400">Multi-modal $(\lambda, m)$ sensor fusion</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="ekfToggle" checked class="sr-only peer" onchange="toggleEKF(this.checked)">
+              <div class="w-11 h-6 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Secondary Telemetry Plots (Time Series) -->
+        <div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Time Plot 1: Optical Vapor Absorption vs RF Mass Residual -->
+          <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-4 backdrop-blur-md flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="radio" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span class="text-xs font-semibold text-gray-200">Vapor Absorption Optical Depth ($\tau$)</span>
+              </div>
+              <span class="text-[10px] mono-font text-cyan-400" id="liveTauReadout">τ = 0.842</span>
+            </div>
+            <div class="h-[140px] w-full bg-[#03050a] rounded-xl border border-gray-800/80 p-1">
+              <canvas id="opticalTelemetryChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Time Plot 2: Reconciled Mass Estimate vs Raw Unfiltered RF -->
+          <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-4 backdrop-blur-md flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span class="text-xs font-semibold text-gray-200">Reconciled Gauging Mass Error</span>
+              </div>
+              <span class="text-[10px] mono-font text-emerald-400" id="liveErrorReadout">±0.18% Err</span>
+            </div>
+            <div class="h-[140px] w-full bg-[#03050a] rounded-xl border border-gray-800/80 p-1">
+              <canvas id="massErrorTelemetryChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Bottom Operational Insight Bar -->
+          <div class="md:col-span-2 bg-gradient-to-r from-cyan-950/30 via-gray-900/40 to-violet-950/30 border border-cyan-900/40 rounded-xl p-3 flex items-center justify-between text-xs">
+            <div class="flex items-center space-x-3">
+              <span class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              </span>
+              <p class="text-gray-300 text-[11px] leading-relaxed">
+                <strong class="text-cyan-300 font-semibold">Zero-G Settling Burn Elimination:</strong> OptoCryo tracks vapor-phase spectral peaks to determine ullage volume and RF eigenmode shifts for liquid quantity. Even during severe non-settled propellant slosh, continuous mass certainty remains within <strong>&lt;0.5%</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: Core Physics & Mathematical Model                                 -->
+    <!-- ========================================================================= -->
+    <div id="viewPhysics" class="hidden space-y-6">
+      <!-- Section Intro -->
+      <div class="border-b border-gray-800 pb-4">
+        <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+          <span>Microgravity Thermodynamics & Electro-Optical Gauging Theory</span>
+        </h2>
+        <p class="text-sm text-gray-400 mt-1">
+          Detailed mathematical formulation of Tuned Diode Laser Absorption Spectroscopy (TDLAS) coupled with Radio-Frequency Modal Gauging in zero-gravity propellant management systems.
+        </p>
+      </div>
+
+      <!-- 4 Technical Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Card 1: Beer-Lambert Spectral Absorption Law -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center space-x-2.5 mb-3">
+            <div class="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+              <i data-lucide="sun" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">1. Multi-Wavelength Vapor Spectrometry</h3>
+              <p class="text-[11px] text-gray-400">Tunable Infrared Laser Diode Absorption across Cryogenic Ullage</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300 leading-relaxed">
+            The vapor mass density $\rho_v$ inside the propellant tank ullage is determined by scanning infrared wavelengths across characteristic ro-vibrational absorption transitions of parahydrogen or methane. The transmitted spectral intensity follows the Beer-Lambert-Bouguer relation:
+          </p>
+
+          <div class="formula-box">
+            $$I(\lambda) = I_0(\lambda) \exp\left( -\int_0^L \sigma_v(\lambda, T, P) \cdot \frac{\rho_v}{M_{\text{mol}}} \, d\ell \right)$$
+          </div>
+
+          <p class="text-xs text-gray-300 leading-relaxed">
+            Where $I_0(\lambda)$ is baseline laser intensity, $\sigma_v(\lambda)$ is the pressure- and temperature-broadened absorption cross-section, $L$ is the multipass optical line-of-sight distance, and $M_{\text{mol}}$ is the molecular molar mass. Decoupling the integrated absorbance path $\tau(\lambda)$ isolates vapor mass independent of liquid globule distribution.
+          </p>
+        </div>
+
+        <!-- Card 2: RF Modal Resonator & Eigenfrequency Shift -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center space-x-2.5 mb-3">
+            <div class="p-2 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-400">
+              <i data-lucide="waves" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">2. Continuous RF Cavity Modal Perturbation</h3>
+              <p class="text-[11px] text-gray-400">Electromagnetic Waveguide Dielectric Loading</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300 leading-relaxed">
+            The tank's inner metallic wall forms an electromagnetic cavity resonator. Introduction of dielectric cryogenic propellant ($\varepsilon_r \approx 1.23$ for $LH_2$, $\varepsilon_r \approx 1.58$ for $LCH_4$) perturbs resonant eigenmodes $\omega_n$ according to the Slater perturbation theorem:
+          </p>
+
+          <div class="formula-box">
+            $$\frac{\Delta \omega_n}{\omega_{n,0}} = -\frac{\int_{V_{\text{liquid}}} (\varepsilon_r - 1) |\mathbf{E}_n|^2 \, dV + \mu_0 \int_{V_{\text{liquid}}} (\mu_r - 1) |\mathbf{H}_n|^2 \, dV}{2 \int_{V_{\text{tank}}} \varepsilon_0 |\mathbf{E}_n|^2 \, dV}$$
+          </div>
+
+          <p class="text-xs text-gray-300 leading-relaxed">
+            By sweeping hundreds of cavity eigenmodes across 100 MHz to 3 GHz, spatial modal weighting averages out local geometry, yielding an instantaneous raw liquid volume estimate $V_{\text{bulk}}$ even when fluid breaks into free-floating globules.
+          </p>
+        </div>
+
+        <!-- Card 3: Multi-Modal Extended Kalman Filter State Observer -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center space-x-2.5 mb-3">
+            <div class="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <i data-lucide="binary" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">3. $(\lambda, m)$ Dual-State Observer & Inversion</h3>
+              <p class="text-[11px] text-gray-400">Continuous Conservation of Total Propellant Mass</p>
+            </div>
+          </div>
+          <p class="text-xs text-gray-300 leading-relaxed">
+            The total propellant mass $M_{\text{total}}$ is conserved as the sum of saturated liquid mass and ullage vapor mass. The state vector $\mathbf{x} = [M_{\text{liq}}, M_{\text{vap}}, T_{\text{tank}}, \dot{Q}_{\text{inleak}}]^T$ is updated continuously:
+          </p>
+
+          <div class="formula-box">
+            $$M_{\text{total}} = \rho_{\text{liq}}(T) \cdot \left[ V_{\text{tank}} - \frac{M_{\text{vap}}}{\rho_v(P, T, \lambda)} \right] + M_{\text{vap}}$$
+          </div>
+
+          <div class="formula-box">
+            $$\hat{\mathbf{x}}_{k|k} = \hat{\mathbf{x}}_{k|k-1} + \mathbf{K}_k \left( \mathbf{z}_k - \mathbf{h}(\hat{\mathbf{x}}_{k|k-1}) \right), \quad \mathbf{z}_k = \begin{bmatrix} \lambda_{\text{peak}} \\ m_{\text{RF}} \end{bmatrix}$$
+          </div>
+
+          <p class="text-xs text-gray-300 leading-relaxed">
+            The measurement matrix $\mathbf{h}(\mathbf{x})$ reconciles optical wavelength absorption depth with bulk RF cavity shifts. Fast slosh motion induces zero net vapor density change, allowing high-frequency rejection of fluid slosh artifacts.
+          </p>
+        </div>
+
+        <!-- Card 4: Cryogenic Hardware & Optical Sensor Architecture -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center space-x-2.5 mb-3">
+            <div class="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <i data-lucide="layers" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">4. Flight Sensor Hardware Architecture</h3>
+              <p class="text-[11px] text-gray-400">Hermetic Sapphire Ports & Non-Intrusive Waveguides</p>
+            </div>
+          </div>
+          <ul class="text-xs text-gray-300 space-y-2 leading-relaxed">
+            <li class="flex items-start space-x-2">
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5"></i>
+              <span><strong>Hermetic Sapphire Optical Windows:</strong> Brazed sapphire retro-reflector ports mounted flush with vacuum jackets withstand thermal shocks from 20 K to 350 K with helium leak rates $&lt; 10^{-10} \text{ atm}\cdot\text{cc/s}$.</span>
+            </li>
+            <li class="flex items-start space-x-2">
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5"></i>
+              <span><strong>Distributed DFB Laser Transceivers:</strong> Telecom-grade InGaAsP distributed feedback lasers scanning 1390 nm–1650 nm provide millikelvin temperature stability outside the cryogenic envelope.</span>
+            </li>
+            <li class="flex items-start space-x-2">
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5"></i>
+              <span><strong>Conformal RF Monopole Antennas:</strong> 2 non-penetrating RF probes transmit low-power (&lt;1 mW) frequency combs avoiding ignition hazards while ensuring complete tank modal coverage.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: $225,000 NASA SBIR/STTR Proposal & Hardware Transition            -->
+    <!-- ========================================================================= -->
+    <div id="viewProposal" class="hidden space-y-6">
+
+      <!-- Topic Alignment Header Banner -->
+      <div class="bg-gradient-to-r from-gray-950 via-gray-900 to-cyan-950/40 border border-cyan-800/40 rounded-2xl p-6 backdrop-blur-md">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="px-2.5 py-1 rounded-md bg-cyan-900/50 border border-cyan-600/60 text-cyan-300 text-xs font-semibold mono-font">
+                NASA SBIR 2026 Phase I
+              </span>
+              <span class="px-2.5 py-1 rounded-md bg-violet-900/40 border border-violet-700/50 text-violet-300 text-xs font-semibold mono-font">
+                Topic Z1.03: CFM Microgravity Gauging
+              </span>
+            </div>
+            <h2 class="text-xl font-bold text-white mt-2">OptoCryo: Dual-Modal Optical $(\lambda)$ and RF $(m)$ Propellant Mass Gauging</h2>
+            <p class="text-xs text-gray-300 mt-1 max-w-3xl">
+              Eliminating the need for reaction control propellant settling burns prior to orbital maneuvering burns, saving up to 5% of mission propellant payload on Artemis lunar landers and orbital propellant depots.
+            </p>
+          </div>
+          <div class="text-right bg-gray-950/80 p-3 rounded-xl border border-gray-800 mono-font">
+            <div class="text-[10px] text-gray-400">PHASE I ALLOCATION</div>
+            <div class="text-2xl font-bold text-cyan-400">$225,000</div>
+            <div class="text-[11px] text-emerald-400">6 Months Period of Performance</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- University Research Partner Split (STTR Focus) -->
+      <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="graduation-cap" class="w-5 h-5 text-cyan-400"></i>
+            <h3 class="text-sm font-bold text-white">Academic Subcontract Partner: University of Central Florida (UCF)</h3>
+          </div>
+          <span class="text-xs mono-font font-semibold px-2.5 py-1 rounded bg-cyan-950 border border-cyan-800 text-cyan-300">
+            30.0% STTR Allocation: $67,500
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div class="p-3 bg-gray-950/60 rounded-xl border border-gray-800/80">
+            <div class="font-semibold text-gray-200">Facility Allocation</div>
+            <p class="text-gray-400 mt-1">Center for Advanced Turbomachinery and Energy Research (CATER) cryogenic testing cells with liquid nitrogen ($LN_2$) and cryo-simulant optical test rings.</p>
+          </div>
+          <div class="p-3 bg-gray-950/60 rounded-xl border border-gray-800/80">
+            <div class="font-semibold text-gray-200">Lead Faculty Principal</div>
+            <p class="text-gray-400 mt-1">Specialists in Optical Diagnostics & Cryogenic Two-Phase Microfluidics, advising on TDLAS multi-pass cell calibration.</p>
+          </div>
+          <div class="p-3 bg-gray-950/60 rounded-xl border border-gray-800/80">
+            <div class="font-semibold text-gray-200">Shared Deliverables</div>
+            <p class="text-gray-400 mt-1">Sub-scale cryostat optical beam transmittance dataset, microgravity droplet dispersion validation, and peer-reviewed joint AIAA CFM paper.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6-Month Milestone Roadmap -->
+      <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+        <h3 class="text-sm font-bold text-white mb-4 flex items-center space-x-2">
+          <i data-lucide="milestone" class="w-4 h-4 text-cyan-400"></i>
+          <span>Phase I Work Breakdown Schedule (Months 1–6)</span>
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <!-- Month 1-2 -->
+          <div class="p-3.5 bg-gray-950/70 border border-gray-800 rounded-xl relative">
+            <div class="text-[11px] mono-font text-cyan-400 font-bold mb-1">M1 – M2: Modeling</div>
+            <h4 class="text-xs font-semibold text-white">Coupled Physics Engine</h4>
+            <p class="text-[11px] text-gray-400 mt-1 leading-relaxed">
+              Synthesize 3D high-fidelity spectral absorption curves for $LH_2$/$LCH_4$ paired with RF electromagnetic cavity eigensolver across 0–100% tank fill.
+            </p>
+            <div class="mt-2 text-[10px] mono-font text-gray-500">Deliverable: D1 Model Report</div>
+          </div>
+
+          <!-- Month 3-4 -->
+          <div class="p-3.5 bg-gray-950/70 border border-gray-800 rounded-xl relative">
+            <div class="text-[11px] mono-font text-violet-400 font-bold mb-1">M3 – M4: Algorithms</div>
+            <h4 class="text-xs font-semibold text-white">EKF State Inversion</h4>
+            <p class="text-[11px] text-gray-400 mt-1 leading-relaxed">
+              Formulate real-time Extended Kalman Filter that decouples dynamic slosh frequencies from net mass content. Demonstrate zero false alarms during simulated jitter.
+            </p>
+            <div class="mt-2 text-[10px] mono-font text-gray-500">Deliverable: D2 Software Package</div>
+          </div>
+
+          <!-- Month 4-5 -->
+          <div class="p-3.5 bg-gray-950/70 border border-gray-800 rounded-xl relative">
+            <div class="text-[11px] mono-font text-amber-400 font-bold mb-1">M4 – M5: Lab Test</div>
+            <h4 class="text-xs font-semibold text-white">Cryogenic Chamber Test</h4>
+            <p class="text-[11px] text-gray-400 mt-1 leading-relaxed">
+              Execute bench-scale $LN_2$ validation at UCF CATER facilities using multi-wavelength laser diodes and coaxial resonator sensors.
+            </p>
+            <div class="mt-2 text-[10px] mono-font text-gray-500">Deliverable: D3 Bench Test Matrix</div>
+          </div>
+
+          <!-- Month 6 -->
+          <div class="p-3.5 bg-gray-950/70 border border-gray-800 rounded-xl relative">
+            <div class="text-[11px] mono-font text-emerald-400 font-bold mb-1">M6: Transition</div>
+            <h4 class="text-xs font-semibold text-white">Phase II Transition Spec</h4>
+            <p class="text-[11px] text-gray-400 mt-1 leading-relaxed">
+              Deliver flight-qualifiable optoelectronic packaging design, radiation hardening assessment, and Phase II flight demonstration roadmap with commercial partners.
+            </p>
+            <div class="mt-2 text-[10px] mono-font text-gray-500">Deliverable: D4 Final Proposal</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase II Hardware Maturation Roadmap -->
+      <div class="bg-gradient-to-br from-gray-900/50 to-gray-950 border border-gray-800 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <span class="text-[11px] mono-font text-cyan-400 font-semibold uppercase tracking-wider">NASA SBIR Phase II Transition Path</span>
+          <h3 class="text-base font-bold text-white mt-1">Scale to $850k–$1.25M TRL-6 Flight Tank Demonstration</h3>
+          <p class="text-xs text-gray-300 mt-1 max-w-2xl">
+            Integration onto commercial flight experiment payloads (e.g., parabolic flight zero-g campaign and suborbital flights) testing true multi-axis globule dynamics in microgravity.
+          </p>
+        </div>
+        <div class="shrink-0 flex items-center space-x-2">
+          <span class="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mono-font">
+            TRL 3 $\rightarrow$ TRL 6 Plan Validated
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: Commercial & Nationwide ARR Breakdown                             -->
+    <!-- ========================================================================= -->
+    <div id="viewARR" class="hidden space-y-6">
+
+      <!-- Executive Overview Banner -->
+      <div class="border-b border-gray-800 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-emerald-400 text-xs mono-font font-semibold">
+              Commercial Market Forecast
+            </span>
+            <span class="text-xs text-gray-400">Civil & Commercial Clean-Tech Applications</span>
+          </div>
+          <h2 class="text-xl font-bold text-white mt-1">Nationwide Civil ARR Model: $218.4M Total Addressable</h2>
+          <p class="text-xs text-gray-300">
+            Applying optical absorption spectrometry and RF state observers across orbital logistics, LNG transport, and hydrogen clean energy.
+          </p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <div class="p-3 bg-gray-950 rounded-xl border border-gray-800 text-right mono-font">
+            <div class="text-[10px] text-gray-500">PROJECTED ENTERPRISE VALUATION</div>
+            <div class="text-xl font-bold text-cyan-400">$1.75B – $2.18B</div>
+            <div class="text-[10px] text-emerald-400">At 8x–10x Deep-Tech Software Multiple</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ARR Vertical Distribution Table -->
+      <div class="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden backdrop-blur-md">
+        <div class="p-4 border-b border-gray-800 bg-gray-950/60 flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+            <i data-lucide="table" class="w-4 h-4 text-cyan-400"></i>
+            <span>Commercial Market Penetration & Software Runtime Revenue</span>
+          </h3>
+          <span class="text-xs text-gray-400 mono-font">5 Core Civil Segments</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-gray-950/80 text-gray-400 uppercase tracking-wider font-semibold border-b border-gray-800">
+              <tr>
+                <th class="py-3 px-4">Market Segment</th>
+                <th class="py-3 px-4">Hardware Base (Nationwide)</th>
+                <th class="py-3 px-4">Software License / Runtime Unit</th>
+                <th class="py-3 px-4">Penetration Rate</th>
+                <th class="py-3 px-4 text-right">Mature ARR ($M)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/60 mono-font text-gray-300">
+              <tr class="hover:bg-gray-800/30 transition">
+                <td class="py-3 px-4 font-sans font-medium text-white flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                  <span>Commercial Orbital Depots & Artemis CFM</span>
+                </td>
+                <td class="py-3 px-4">120 Spacecraft / Depots</td>
+                <td class="py-3 px-4">$350,000 / year / node</td>
+                <td class="py-3 px-4">65%</td>
+                <td class="py-3 px-4 text-right text-cyan-300 font-bold">$27.3M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30 transition">
+                <td class="py-3 px-4 font-sans font-medium text-white flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span>Liquid Hydrogen (LH2) Long-Haul Logistics</span>
+                </td>
+                <td class="py-3 px-4">18,500 Intermodal Cryo-Trailers</td>
+                <td class="py-3 px-4">$4,800 / year / tanker</td>
+                <td class="py-3 px-4">40%</td>
+                <td class="py-3 px-4 text-right text-emerald-300 font-bold">$35.5M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30 transition">
+                <td class="py-3 px-4 font-sans font-medium text-white flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                  <span>Maritime LNG Carriers Slosh & Boil-off Mgmt</span>
+                </td>
+                <td class="py-3 px-4">740 Global Vessels</td>
+                <td class="py-3 px-4">$85,000 / year / vessel</td>
+                <td class="py-3 px-4">70%</td>
+                <td class="py-3 px-4 text-right text-violet-300 font-bold">$44.0M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30 transition">
+                <td class="py-3 px-4 font-sans font-medium text-white flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                  <span>Cryogenic Clean Aviation ($LH_2$ Airframes)</span>
+                </td>
+                <td class="py-3 px-4">2,200 Commercial Jetliners</td>
+                <td class="py-3 px-4">$28,000 / year / aircraft</td>
+                <td class="py-3 px-4">50%</td>
+                <td class="py-3 px-4 text-right text-amber-300 font-bold">$30.8M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30 transition">
+                <td class="py-3 px-4 font-sans font-medium text-white flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                  <span>Semiconductor Cryo-Etch Gas Tanks ($CF_4$/$NF_3$)</span>
+                </td>
+                <td class="py-3 px-4">32,000 Cleanroom Bulk Cylinders</td>
+                <td class="py-3 px-4">$3,200 / year / bulk rack</td>
+                <td class="py-3 px-4">78%</td>
+                <td class="py-3 px-4 text-right text-rose-300 font-bold">$80.8M</td>
+              </tr>
+              <tr class="bg-gray-950 font-bold text-white border-t-2 border-gray-700">
+                <td class="py-3 px-4 font-sans uppercase">Total Nationwide Addressable ARR</td>
+                <td class="py-3 px-4">53,560 Deployed Assets</td>
+                <td class="py-3 px-4">—</td>
+                <td class="py-3 px-4">—</td>
+                <td class="py-3 px-4 text-right text-emerald-400 text-sm font-bold">$218.4M</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Industry Deep-Dive Cards (Physics & Plain English For Executives) -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Deep Dive 1: Space Orbital Depots -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="rocket" class="w-4 h-4 text-cyan-400"></i>
+              <span>Commercial Orbital Fuel Depots</span>
+            </h4>
+            <span class="text-[11px] mono-font text-cyan-300 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">$27.3M ARR</span>
+          </div>
+          <div class="text-xs space-y-2 mt-3">
+            <p class="text-cyan-200/90 font-medium bg-cyan-950/40 p-2.5 rounded-lg border border-cyan-900/40">
+              <strong>Physics in 1 Sentence:</strong> In microgravity, surface tension forces cause cryogenic liquids to coat tank walls while vapor forms a central core, defying traditional hydrostatic pressure taps.
+            </p>
+            <p class="text-gray-300 leading-relaxed">
+              <strong>Why Others Missed This (Plain English for Executives):</strong> Legacy programs burn valuable thruster fuel solely to press propellant against the tank floor just to measure how much gas they have. OptoCryo calculates mass passively through laser infrared absorption and RF resonance without expending a single gram of thruster fuel.
+            </p>
+          </div>
+        </div>
+
+        <!-- Deep Dive 2: LH2 Road Transport -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="truck" class="w-4 h-4 text-emerald-400"></i>
+              <span>Liquid Hydrogen (LH2) Road Logistics</span>
+            </h4>
+            <span class="text-[11px] mono-font text-emerald-300 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">$35.5M ARR</span>
+          </div>
+          <div class="text-xs space-y-2 mt-3">
+            <p class="text-emerald-200/90 font-medium bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-900/40">
+              <strong>Physics in 1 Sentence:</strong> Road trailer sloshing causes erratic delta-pressure oscillations and false low-level shutoff alarms during bulk liquid transfer.
+            </p>
+            <p class="text-gray-300 leading-relaxed">
+              <strong>Why Others Missed This (Plain English for Executives):</strong> Incumbents rely on mechanical differential pressure sensors with cold capillary tubes that freeze up or oscillate wildy during transit. OptoCryo uses optical waveguides with no moving parts to give continuous custody transfer accuracy.
+            </p>
+          </div>
+        </div>
+
+        <!-- Deep Dive 3: Maritime LNG Slosh -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="ship" class="w-4 h-4 text-violet-400"></i>
+              <span>Maritime LNG Tankers</span>
+            </h4>
+            <span class="text-[11px] mono-font text-violet-300 bg-violet-950 px-2 py-0.5 rounded border border-violet-800">$44.0M ARR</span>
+          </div>
+          <div class="text-xs space-y-2 mt-3">
+            <p class="text-violet-200/90 font-medium bg-violet-950/40 p-2.5 rounded-lg border border-violet-900/40">
+              <strong>Physics in 1 Sentence:</strong> Wave-induced sloshing accelerates boil-off gas (BOG) rates by violently expanding interfacial surface area between vapor and liquid.
+            </p>
+            <p class="text-gray-300 leading-relaxed">
+              <strong>Why Others Missed This (Plain English for Executives):</strong> Maritime operators treat boil-off as an unpredictable mystery. OptoCryo's absorption state observer tracks exact vapor generation kinetics in real time, enabling predictive reliquefaction compressor staging that cuts boil-off loss by 22%.
+            </p>
+          </div>
+        </div>
+
+        <!-- Deep Dive 4: Semiconductor Cleanroom Fab Gases -->
+        <div class="bg-gray-900/40 border border-gray-800 rounded-2xl p-5 backdrop-blur-md">
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="microchip" class="w-4 h-4 text-rose-400"></i>
+              <span>Semiconductor Fab Ultra-Pure Etch Gases</span>
+            </h4>
+            <span class="text-[11px] mono-font text-rose-300 bg-rose-950 px-2 py-0.5 rounded border border-rose-800">$80.8M ARR</span>
+          </div>
+          <div class="text-xs space-y-2 mt-3">
+            <p class="text-rose-200/90 font-medium bg-rose-950/40 p-2.5 rounded-lg border border-rose-900/40">
+              <strong>Physics in 1 Sentence:</strong> Liquefied fluorinated gases in high-pressure cylinders exhibit variable supercritical transitions during aggressive wafer etch tool drawdowns.
+            </p>
+            <p class="text-gray-300 leading-relaxed">
+              <strong>Why Others Missed This (Plain English for Executives):</strong> Semiconductor fabs pull cylinders based on crude scale weights, accidentally sending cylinders back with 15% expensive gas remaining to avoid running dry mid-batch. OptoCryo allows 99.8% cylinder depletion with zero line-drop risk.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collaboration & Investor Call-to-Action -->
+      <div class="bg-gradient-to-r from-gray-950 via-cyan-950/30 to-gray-950 border border-cyan-800/50 rounded-2xl p-6 text-center space-y-3">
+        <h3 class="text-base font-bold text-white">Commercial Partnership & Technology Licensing</h3>
+        <p class="text-xs text-gray-300 max-w-xl mx-auto leading-relaxed">
+          OptoCryo's sensor fusion software stack is available for NASA CFM hardware qualification, aerospace prime contractor flight trials, and commercial clean-tech licensing.
+        </p>
+        <div class="pt-2">
+          <a href="mailto:support@rfwavecode.com" class="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white text-xs font-semibold shadow-lg transition">
+            <i data-lucide="mail" class="w-4 h-4"></i>
+            <span>Contact R&D Team: support@rfwavecode.com</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Global Application Logic & Physical Simulation Engine -->
+  <script>
+    // =========================================================================
+    // 1. Tab Navigation & View Mapping
+    // =========================================================================
+    const tabMapping = {
+      'sim': { viewId: 'viewSim', btnId: 'tabBtnSim' },
+      'physics': { viewId: 'viewPhysics', btnId: 'tabBtnPhysics' },
+      'proposal': { viewId: 'viewProposal', btnId: 'tabBtnProposal' },
+      'arr': { viewId: 'viewARR', btnId: 'tabBtnARR' }
+    };
+
+    let activeTab = 'sim';
+
+    function switchTab(targetKey) {
+      Object.keys(tabMapping).forEach(key => {
+        const item = tabMapping[key];
+        const viewEl = document.getElementById(item.viewId);
+        const btnEl = document.getElementById(item.btnId);
+
+        if (key === targetKey) {
+          viewEl.classList.remove('hidden');
+          btnEl.className = 'px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 bg-cyan-600 text-white shadow-sm flex items-center space-x-1.5';
+        } else {
+          viewEl.classList.add('hidden');
+          btnEl.className = 'px-3 py-1.5 text-xs sm:text-sm rounded-lg font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900 flex items-center space-x-1.5';
+        }
+      });
+
+      activeTab = targetKey;
+
+      // Handle MathJax typesetting when switching views
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise();
+      }
+
+      // Handle responsive canvas redraw
+      if (targetKey === 'sim') {
+        setTimeout(() => {
+          resizeCanvas();
+        }, 50);
+      }
+    }
+
+    // =========================================================================
+    // 2. Physical State Variables & Simulation Model
+    // =========================================================================
+    const simState = {
+      fillFraction: 0.68,         // 68% nominal fill
+      nominalMass: 7000 * 0.68,   // kg of propellant in reference tank (approx 4760 kg)
+      sloshJitter: 0.45,          // m/s^2 jitter acceleration
+      heatInleak: 12.0,           // Watts
+      ekfEnabled: true,
+      boilOffEvent: false,
+      tick: 0,
+      
+      // Dynamic variables
+      currentWavelength: 1.412,   // µm (Beer-Lambert peak for H2 ullage)
+      vaporDensity: 1.34,         // kg/m^3
+      measuredMass: 4812,         // kg
+      filteredMass: 4812,         // kg
+      tau: 0.842,
+      errorPercent: 0.18,
+      tankTemp: 20.4,             // Kelvin
+      fuelSaved: 142.8,
+
+      // Droplet particles for canvas microgravity fluid
+      droplets: []
+    };
+
+    // Phase Space nominal line equation & history
+    const nominalTrajectoryHistory = [];
+    const MAX_HISTORY = 35;
+
+    // Initialize random microgravity droplets
+    function initDroplets() {
+      simState.droplets = [];
+      const numDroplets = 28;
+      for (let i = 0; i < numDroplets; i++) {
+        simState.droplets.push({
+          x: 0.2 + Math.random() * 0.6, // relative 0..1 in tank
+          y: 0.2 + Math.random() * 0.6,
+          r: 12 + Math.random() * 22,   // radius
+          vx: (Math.random() - 0.5) * 0.003,
+          vy: (Math.random() - 0.5) * 0.003,
+          targetR: 12 + Math.random() * 22,
+          hue: 195 + Math.random() * 20
+        });
+      }
+    }
+    initDroplets();
+
+    // =========================================================================
+    // 3. Chart.js Setup: Phase-Space & Telemetry
+    // =========================================================================
+    let phaseSpaceChart, opticalTelemetryChart, massErrorTelemetryChart;
+
+    function initCharts() {
+      // 1. Primary Phase Space Chart: Wavelength (Lambda) vs Mass (m)
+      const ctxPhase = document.getElementById('phaseSpaceChart').getContext('2d');
+
+      // Generate theoretical baseline corridor (Lambda: 1.35 to 1.55 um)
+      const baselineData = [];
+      for (let w = 1.35; w <= 1.55; w += 0.01) {
+        // Linear-coupled thermodynamic phase line
+        // Higher ullage vapor absorption corresponds to lower liquid mass
+        const m = 6800 - (w - 1.35) * 16000;
+        baselineData.push({ x: parseFloat(w.toFixed(3)), y: Math.round(m) });
+      }
+
+      phaseSpaceChart = new Chart(ctxPhase, {
+        type: 'scatter',
+        data: {
+          datasets: [
+            {
+              label: 'Theoretical Equilibrium Corridor',
+              data: baselineData,
+              showLine: true,
+              borderColor: 'rgba(6, 182, 212, 0.4)',
+              borderWidth: 2,
+              borderDash: [4, 4],
+              pointRadius: 0,
+              fill: false
+            },
+            {
+              label: 'Slosh Anomaly Hazard Boundary',
+              data: [
+                { x: 1.35, y: 7200 },
+                { x: 1.45, y: 5500 },
+                { x: 1.55, y: 4100 }
+              ],
+              showLine: true,
+              borderColor: 'rgba(239, 68, 68, 0.4)',
+              borderWidth: 1.5,
+              borderDash: [6, 4],
+              pointRadius: 0,
+              fill: false
+            },
+            {
+              label: 'Recent $(\\lambda, m)$ Trajectory',
+              data: [],
+              showLine: true,
+              borderColor: 'rgba(139, 92, 246, 0.6)',
+              borderWidth: 2,
+              pointRadius: 2,
+              pointBackgroundColor: '#8b5cf6',
+              fill: false
+            },
+            {
+              label: 'Active System State',
+              data: [{ x: simState.currentWavelength, y: simState.measuredMass }],
+              pointRadius: 7,
+              pointHoverRadius: 9,
+              pointBackgroundColor: '#06b6d4',
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 0 },
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Absorption Peak Wavelength λ (µm)',
+                color: '#94a3b8',
+                font: { size: 10, family: 'JetBrains Mono' }
+              },
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748b', font: { size: 9, family: 'JetBrains Mono' } },
+              min: 1.35,
+              max: 1.55
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'RF Measured Bulk Mass m (kg)',
+                color: '#94a3b8',
+                font: { size: 10, family: 'JetBrains Mono' }
+              },
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748b', font: { size: 9, family: 'JetBrains Mono' } },
+              min: 3000,
+              max: 7000
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return `λ: ${context.parsed.x} µm, Mass: ${context.parsed.y} kg`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Optical Telemetry Chart (Tau vs Time)
+      const ctxOptical = document.getElementById('opticalTelemetryChart').getContext('2d');
+      opticalTelemetryChart = new Chart(ctxOptical, {
+        type: 'line',
+        data: {
+          labels: Array(25).fill(''),
+          datasets: [{
+            data: Array(25).fill(0.84),
+            borderColor: '#06b6d4',
+            borderWidth: 1.8,
+            pointRadius: 0,
+            tension: 0.35,
+            fill: true,
+            backgroundColor: 'rgba(6, 182, 212, 0.08)'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748b', font: { size: 9, family: 'JetBrains Mono' } },
+              min: 0.6,
+              max: 1.2
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+
+      // 3. Mass Error Telemetry Chart (Unfiltered vs EKF Filtered)
+      const ctxMassErr = document.getElementById('massErrorTelemetryChart').getContext('2d');
+      massErrorTelemetryChart = new Chart(ctxMassErr, {
+        type: 'line',
+        data: {
+          labels: Array(25).fill(''),
+          datasets: [
+            {
+              label: 'Raw RF Noise Error (%)',
+              data: Array(25).fill(2.5),
+              borderColor: 'rgba(244, 63, 94, 0.5)',
+              borderWidth: 1.2,
+              borderDash: [3, 3],
+              pointRadius: 0,
+              tension: 0.2
+            },
+            {
+              label: 'OptoCryo Reconciled Error (%)',
+              data: Array(25).fill(0.2),
+              borderColor: '#10b981',
+              borderWidth: 1.8,
+              pointRadius: 0,
+              tension: 0.2,
+              fill: true,
+              backgroundColor: 'rgba(16, 185, 129, 0.08)'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: { display: false },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748b', font: { size: 9, family: 'JetBrains Mono' } },
+              min: 0,
+              max: 6
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    // =========================================================================
+    // 4. HTML5 Canvas Rendering: Microgravity Cryogenic Tank
+    // =========================================================================
+    const canvas = document.getElementById('tankCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 600;
+      const h = rect.height || 340;
+      canvas.width = w * window.devicePixelRatio;
+      canvas.height = h * window.devicePixelRatio;
+      ctx.resetTransform();
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+    });
+
+    function drawTankSimulation() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 600;
+      const h = rect.height || 340;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Tank Geometry Coordinates (Rounded pill tank)
+      const tankW = w * 0.85;
+      const tankH = h * 0.78;
+      const tankX = (w - tankW) / 2;
+      const tankY = (h - tankH) / 2;
+      const cornerR = Math.min(tankW, tankH) * 0.35;
+
+      // 1. Draw Multi-Layer Insulation (MLI) Outer Shell
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(tankX - 6, tankY - 6, tankW + 12, tankH + 12, cornerR + 6);
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Golden foil tick lines on MLI
+      ctx.setLineDash([8, 8]);
+      ctx.strokeStyle = '#854d0e';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Tank Pressure Vessel Wall
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(tankX, tankY, tankW, tankH, cornerR);
+      ctx.fillStyle = '#070b14';
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.stroke();
+      ctx.clip(); // Restrict fluid & lasers inside the tank interior
+
+      // 3. Draw Laser Optics Multi-Pass Optical Grid (TDLAS Beam)
+      ctx.save();
+      const laserY1 = tankY + tankH * 0.28;
+      const laserY2 = tankY + tankH * 0.52;
+      const laserY3 = tankY + tankH * 0.74;
+
+      ctx.beginPath();
+      ctx.moveTo(tankX + 10, laserY1);
+      ctx.lineTo(tankX + tankW - 10, laserY1 + 15);
+      ctx.lineTo(tankX + 15, laserY2);
+      ctx.lineTo(tankX + tankW - 10, laserY2 + 20);
+      ctx.lineTo(tankX + 10, laserY3);
+      ctx.lineTo(tankX + tankW - 15, laserY3 - 15);
+
+      ctx.strokeStyle = simState.boilOffEvent ? 'rgba(244, 63, 94, 0.75)' : 'rgba(6, 182, 212, 0.65)';
+      ctx.lineWidth = 2;
+      ctx.shadowColor = simState.boilOffEvent ? '#f43f5e' : '#06b6d4';
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.restore();
+
+      // 4. Draw RF Electromagnetic Standing Wave Resonances (Concentric Iso-Electric Fields)
+      ctx.save();
+      const rfPhase = simState.tick * 0.08;
+      ctx.strokeStyle = 'rgba(139, 92, 246, 0.12)';
+      ctx.lineWidth = 1.5;
+      for (let r = 25; r < tankW * 0.6; r += 32) {
+        ctx.beginPath();
+        const ripple = Math.sin(rfPhase + r * 0.05) * 4;
+        ctx.ellipse(tankX + tankW * 0.5, tankY + tankH * 0.5, r + ripple, (r + ripple) * 0.6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 5. Simulate Microgravity Liquid Droplets & Globules
+      const jitterFactor = simState.sloshJitter * 0.015;
+      simState.droplets.forEach((d, idx) => {
+        // Apply random zero-g Brownian wander + slosh jitter
+        d.x += d.vx + (Math.sin(simState.tick * 0.04 + idx) * jitterFactor);
+        d.y += d.vy + (Math.cos(simState.tick * 0.05 + idx) * jitterFactor);
+
+        // Keep inside normalized 0.12..0.88 tank interior bounds
+        if (d.x < 0.12) { d.x = 0.12; d.vx *= -1; }
+        if (d.x > 0.88) { d.x = 0.88; d.vx *= -1; }
+        if (d.y < 0.15) { d.y = 0.15; d.vy *= -1; }
+        if (d.y > 0.85) { d.y = 0.85; d.vy *= -1; }
+
+        // Scale radius with fill level
+        const currentR = d.r * (simState.fillFraction * 1.3);
+
+        const px = tankX + d.x * tankW;
+        const py = tankY + d.y * tankH;
+
+        // Draw Liquid Hydrogen / Methane Globule
+        ctx.save();
+        const grad = ctx.createRadialGradient(px - currentR * 0.3, py - currentR * 0.3, 2, px, py, currentR);
+        grad.addColorStop(0, 'rgba(125, 211, 252, 0.7)');
+        grad.addColorStop(0.6, 'rgba(14, 165, 233, 0.45)');
+        grad.addColorStop(1, 'rgba(3, 105, 161, 0.15)');
+
+        ctx.beginPath();
+        // Dynamic droplet deformation under jitter
+        const deformX = 1 + Math.sin(simState.tick * 0.1 + idx) * (simState.sloshJitter * 0.15);
+        const deformY = 1 - Math.sin(simState.tick * 0.1 + idx) * (simState.sloshJitter * 0.15);
+        ctx.ellipse(px, py, Math.max(4, currentR * deformX), Math.max(4, currentR * deformY), idx, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'rgba(186, 230, 253, 0.5)';
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 6. Ullage Vapor Fog / Density Shimmer
+      ctx.save();
+      const fogAlpha = 0.04 + (simState.vaporDensity * 0.03);
+      ctx.fillStyle = simState.boilOffEvent ? `rgba(244, 63, 94, ${fogAlpha * 2})` : `rgba(34, 211, 238, ${fogAlpha})`;
+      ctx.fillRect(tankX, tankY, tankW, tankH);
+      ctx.restore();
+
+      ctx.restore(); // Restore clip
+
+      // 7. Sensor Hardware Mounts on Outside of Vessel
+      // Optical Emitter Port (Top Left)
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(tankX - 8, laserY1 - 8, 8, 16);
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(tankX - 4, laserY1, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Optical Receiver Port (Bottom Right)
+      ctx.fillStyle = '#06b6d4';
+      ctx.fillRect(tankX + tankW, laserY3 - 23, 8, 16);
+
+      // RF Resonator Antenna Probes
+      ctx.fillStyle = '#a855f7';
+      ctx.fillRect(tankX + tankW * 0.35, tankY - 7, 14, 7);
+      ctx.fillRect(tankX + tankW * 0.65, tankY + tankH, 14, 7);
+    }
+
+    // =========================================================================
+    // 5. Physics Simulation Step & Closed Loop Updates
+    // =========================================================================
+    function stepSimulation() {
+      simState.tick++;
+
+      // 1. Calculate true physical mass based on fill fraction
+      const targetMass = 7000 * simState.fillFraction;
+
+      // 2. High-speed slosh induces RF cavity noise
+      const sloshNoise = (Math.sin(simState.tick * 0.25) * 45 + (Math.random() - 0.5) * 80) * (simState.sloshJitter * 1.8);
+      simState.measuredMass = Math.round(targetMass + sloshNoise);
+
+      // 3. Wavelength absorption shift: As liquid decreases (fill drops), ullage volume increases,
+      // and heat inleak increases vapor absorption density
+      const boilOffBonus = simState.boilOffEvent ? 0.05 : 0.0;
+      const baseWavelength = 1.365 + (1 - simState.fillFraction) * 0.12 + (simState.heatInleak * 0.0008) + boilOffBonus;
+      // Add slight optical measurement scintillation
+      const opticalJitter = (Math.random() - 0.5) * 0.0015;
+      simState.currentWavelength = parseFloat((baseWavelength + opticalJitter).toFixed(3));
+
+      // 4. Ullage vapor density and optical depth
+      simState.vaporDensity = parseFloat((0.85 + (1 - simState.fillFraction) * 0.9 + (simState.heatInleak * 0.03)).toFixed(2));
+      simState.tau = parseFloat((0.55 + simState.vaporDensity * 0.28).toFixed(3));
+
+      // 5. Extended Kalman Filter (EKF) Reconciled Mass
+      if (simState.ekfEnabled) {
+        // EKF uses optical absorption wavelength to cross-check true ullage volume
+        // decouples high-frequency RF slosh spikes
+        const opticalDerivedLiquidVol = (1.52 - simState.currentWavelength) / 0.15; // normalized 0..1
+        const opticalDerivedMass = 7000 * Math.max(0.05, Math.min(0.98, opticalDerivedLiquidVol));
+
+        // Sensor fusion weighting
+        simState.filteredMass = Math.round(0.88 * opticalDerivedMass + 0.12 * simState.measuredMass);
+        simState.errorPercent = parseFloat((Math.abs(simState.filteredMass - targetMass) / targetMass * 100).toFixed(2));
+      } else {
+        // EKF Disabled: Raw RF mass subjected to severe slosh error
+        simState.filteredMass = simState.measuredMass;
+        simState.errorPercent = parseFloat((Math.abs(sloshNoise) / targetMass * 100).toFixed(2));
+      }
+
+      // 6. Tank temperature thermodynamics
+      simState.tankTemp = parseFloat((20.2 + (simState.heatInleak * 0.02) + (simState.boilOffEvent ? 1.8 : 0)).toFixed(1));
+
+      // 7. Reaction Control Fuel Saved counter (simulated cumulative savings)
+      simState.fuelSaved = parseFloat((142.8 + (simState.tick * 0.025)).toFixed(1));
+
+      // Update DOM Readouts
+      updateDOMTelemetry();
+
+      // Render Canvas
+      drawTankSimulation();
+
+      // Update Charts every 3 ticks to optimize rendering
+      if (simState.tick % 3 === 0) {
+        updateChartTelemetry();
+      }
+    }
+
+    function updateDOMTelemetry() {
+      document.getElementById('telemetryWavelength').textContent = `${simState.currentWavelength.toFixed(3)} µm`;
+      document.getElementById('telemetryVapor').textContent = `${simState.vaporDensity} kg/m³`;
+      document.getElementById('telemetryMass').textContent = `${simState.filteredMass.toLocaleString()} kg`;
+      document.getElementById('telemetryFill').textContent = `${(simState.fillFraction * 100).toFixed(1)} %`;
+      document.getElementById('telemetryTemp').textContent = `${simState.tankTemp} K`;
+      document.getElementById('telemetryFuelSaved').textContent = `${simState.fuelSaved} kg`;
+
+      document.getElementById('liveTauReadout').textContent = `τ = ${simState.tau}`;
+      document.getElementById('liveErrorReadout').textContent = `±${simState.errorPercent}% Err`;
+
+      document.getElementById('phaseCoordReadout').textContent = `λ: ${simState.currentWavelength.toFixed(3)} µm | m: ${simState.filteredMass} kg`;
+
+      const confEl = document.getElementById('observerConfidence');
+      if (simState.errorPercent < 0.5) {
+        confEl.textContent = '99.5% (High Precision)';
+        confEl.className = 'text-emerald-400 mono-font font-medium';
+      } else if (simState.errorPercent < 2.0) {
+        confEl.textContent = '96.2% (Moderate Jitter)';
+        confEl.className = 'text-amber-400 mono-font font-medium';
+      } else {
+        confEl.textContent = '84.0% (Unfiltered Slosh)';
+        confEl.className = 'text-rose-400 mono-font font-medium';
+      }
+
+      // Status Badge
+      const badge = document.getElementById('tankStateBadge');
+      if (simState.boilOffEvent) {
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span><span class="text-rose-400">Boil-Off Vent Transient</span>`;
+      } else if (simState.sloshJitter > 1.0) {
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span><span class="text-amber-300">Severe Slosh Dispersion</span>`;
+      } else {
+        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span class="text-emerald-400">Reconciled Equilibrium</span>`;
+      }
+
+      // Overlay text on canvas
+      document.getElementById('overlayG').textContent = `a = ${(simState.sloshJitter * 0.001).toFixed(4)} g`;
+      document.getElementById('overlayState').textContent = simState.sloshJitter > 0.8 ? 'Chaotic Floating Globules' : 'Quiescent Multi-Drop Equilibrium';
+    }
+
+    function updateChartTelemetry() {
+      if (!phaseSpaceChart || !opticalTelemetryChart || !massErrorTelemetryChart) return;
+
+      // 1. Update Phase Space Live Trajectory
+      nominalTrajectoryHistory.push({
+        x: simState.currentWavelength,
+        y: simState.measuredMass
+      });
+      if (nominalTrajectoryHistory.length > MAX_HISTORY) {
+        nominalTrajectoryHistory.shift();
+      }
+
+      phaseSpaceChart.data.datasets[2].data = [...nominalTrajectoryHistory];
+      phaseSpaceChart.data.datasets[3].data = [{
+        x: simState.currentWavelength,
+        y: simState.filteredMass
+      }];
+      phaseSpaceChart.update('none');
+
+      // 2. Optical Telemetry Chart
+      const optData = opticalTelemetryChart.data.datasets[0].data;
+      optData.shift();
+      optData.push(simState.tau);
+      opticalTelemetryChart.update('none');
+
+      // 3. Mass Error Telemetry Chart
+      const rawErrData = massErrorTelemetryChart.data.datasets[0].data;
+      const ekfErrData = massErrorTelemetryChart.data.datasets[1].data;
+      rawErrData.shift();
+      ekfErrData.shift();
+
+      const rawNoisePercent = (Math.abs(simState.measuredMass - (7000 * simState.fillFraction)) / (7000 * simState.fillFraction)) * 100;
+      rawErrData.push(Math.min(5.8, rawNoisePercent));
+      ekfErrData.push(simState.errorPercent);
+      massErrorTelemetryChart.update('none');
+    }
+
+    // =========================================================================
+    // 6. User Interactive Controls & Event Handlers
+    // =========================================================================
+    function updateFillSlider(val) {
+      simState.fillFraction = val / 100;
+      document.getElementById('sliderFillLabel').textContent = `${val} %`;
+    }
+
+    function updateSloshSlider(val) {
+      simState.sloshJitter = val / 100;
+      document.getElementById('sliderSloshLabel').textContent = `${(val / 100).toFixed(2)} m/s²`;
+    }
+
+    function updateHeatSlider(val) {
+      simState.heatInleak = parseFloat(val);
+      document.getElementById('sliderHeatLabel').textContent = `${val}.0 W`;
+    }
+
+    function toggleEKF(enabled) {
+      simState.ekfEnabled = enabled;
+      const badge = document.getElementById('canvasModeBadge');
+      if (enabled) {
+        badge.textContent = 'TUNED DIODE LASER ACTIVE';
+        badge.className = 'text-[11px] mono-font px-2.5 py-1 rounded-md bg-cyan-900/40 border border-cyan-700/60 text-cyan-300';
+      } else {
+        badge.textContent = 'RAW RF UNFILTERED (EKF OFF)';
+        badge.className = 'text-[11px] mono-font px-2.5 py-1 rounded-md bg-rose-900/40 border border-rose-700/60 text-rose-300';
+      }
+    }
+
+    function triggerImpulseSlosh() {
+      // Impulse kinetic kick to droplets
+      simState.droplets.forEach(d => {
+        d.vx += (Math.random() - 0.5) * 0.02;
+        d.vy += (Math.random() - 0.5) * 0.02;
+      });
+      // Temporarily bump jitter slider
+      const prevJitter = simState.sloshJitter;
+      simState.sloshJitter = 1.85;
+      document.getElementById('sliderSlosh').value = 185;
+      document.getElementById('sliderSloshLabel').textContent = '1.85 m/s²';
+
+      setTimeout(() => {
+        simState.sloshJitter = prevJitter;
+        document.getElementById('sliderSlosh').value = prevJitter * 100;
+        document.getElementById('sliderSloshLabel').textContent = `${prevJitter.toFixed(2)} m/s²`;
+      }, 3000);
+    }
+
+    function toggleBoilOffAnomaly() {
+      simState.boilOffEvent = !simState.boilOffEvent;
+      const btn = document.getElementById('btnBoilOff');
+      if (simState.boilOffEvent) {
+        btn.classList.add('bg-rose-950', 'border-rose-400');
+        btn.innerHTML = `<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i><span>Vent Active (Purging)</span>`;
+      } else {
+        btn.classList.remove('bg-rose-950', 'border-rose-400');
+        btn.innerHTML = `<i data-lucide="flame" class="w-3.5 h-3.5"></i><span>Simulate Vent Spike</span>`;
+      }
+      lucide.createIcons();
+    }
+
+    function triggerLaserAutoCalibration() {
+      const originalWavelength = simState.currentWavelength;
+      simState.currentWavelength = 1.390;
+      setTimeout(() => { simState.currentWavelength = 1.450; }, 200);
+      setTimeout(() => { simState.currentWavelength = 1.510; }, 400);
+      setTimeout(() => { simState.currentWavelength = originalWavelength; }, 700);
+    }
+
+    function resetSimulation() {
+      simState.fillFraction = 0.68;
+      simState.sloshJitter = 0.45;
+      simState.heatInleak = 12.0;
+      simState.ekfEnabled = true;
+      simState.boilOffEvent = false;
+
+      document.getElementById('sliderFill').value = 68;
+      document.getElementById('sliderFillLabel').textContent = '68 %';
+      document.getElementById('sliderSlosh').value = 45;
+      document.getElementById('sliderSloshLabel').textContent = '0.45 m/s²';
+      document.getElementById('sliderHeat').value = 12;
+      document.getElementById('sliderHeatLabel').textContent = '12.0 W';
+      document.getElementById('ekfToggle').checked = true;
+
+      const btn = document.getElementById('btnBoilOff');
+      btn.classList.remove('bg-rose-950', 'border-rose-400');
+      btn.innerHTML = `<i data-lucide="flame" class="w-3.5 h-3.5"></i><span>Simulate Vent Spike</span>`;
+
+      toggleEKF(true);
+      initDroplets();
+      lucide.createIcons();
+    }
+
+    // =========================================================================
+    // 7. Application Initialization
+    // =========================================================================
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. Render Lucide Icons
+      lucide.createIcons();
+
+      // 2. Size canvas
+      resizeCanvas();
+
+      // 3. Initialize Chart.js
+      initCharts();
+
+      // 4. Start Physics & Telemetry Animation Loop (40ms tick = ~25 fps)
+      setInterval(stepSimulation, 40);
+
+      // 5. Initial MathJax typesetting
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise();
+      }
+    });
+  </script>
+</body>
+</html>
